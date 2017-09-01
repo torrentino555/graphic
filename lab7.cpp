@@ -14,7 +14,7 @@
 using namespace std;
 
 int WIDTH = 600, HEIGHT = 600, spin_x = 0, spin_y = 0, spin_z = 0, step = 150,
-    sign_animation = 1;
+    sign_animation = 1, onTex = 1;
 float x = 0, y = 0, scale = 1, x_l = 0.95, y_l = 0.0, z_l = 0.0, angle = 0,
       spin_l = 0, t = 0, radiusCilindre = 0.1, heightCilindre = 0.3,
       timer = glfwGetTime(), buffer = 0, dt;
@@ -155,8 +155,13 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action,
     moving = !moving;
   else if (key == GLFW_KEY_P && action == GLFW_PRESS)
     light = !light;
-  else if (key == GLFW_KEY_T && action == GLFW_PRESS)
+  else if (key == GLFW_KEY_T && action == GLFW_PRESS) {
+    if (!drawT)
+      onTex = 10;
+    else
+      onTex = 1;
     drawT = !drawT;
+  }
   else if (key == GLFW_KEY_O && action == GLFW_PRESS) {
     activeLight = !activeLight;
     glDisable(GL_LIGHTING);
@@ -230,43 +235,53 @@ void MoveLight() {
 }
 
 void drawCube(float x) {
-  glBegin(GL_QUADS);
-  glColor3f(1, 1, 1);
-  glVertex3f(-x, -x, -x);
-  glVertex3f(x, -x, -x);
-  glVertex3f(x, x, -x);
-  glVertex3f(-x, x, -x);
-  glEnd();
-  glBegin(GL_QUADS);
-  glVertex3f(-x, -x, x);
-  glVertex3f(x, -x, x);
-  glVertex3f(x, x, x);
-  glVertex3f(-x, x, x);
-  glEnd();
-  glBegin(GL_QUADS);
-  glVertex3f(x, -x, x);
-  glVertex3f(x, -x, -x);
-  glVertex3f(x, x, -x);
-  glVertex3f(x, x, x);
-  glEnd();
-  glBegin(GL_QUADS);
-  glVertex3f(-x, -x, -x);
-  glVertex3f(-x, -x, x);
-  glVertex3f(-x, x, x);
-  glVertex3f(-x, x, -x);
-  glEnd();
-  glBegin(GL_QUADS);
-  glVertex3f(x, x, x);
-  glVertex3f(x, x, -x);
-  glVertex3f(-x, x, -x);
-  glVertex3f(-x, x, x);
-  glEnd();
-  glBegin(GL_QUADS);
-  glVertex3f(-x, -x, -x);
-  glVertex3f(x, -x, -x);
-  glVertex3f(x, -x, x);
-  glVertex3f(-x, -x, x);
-  glEnd();
+  GLfloat vertex[] = {
+    -x, -x, -x,
+     x, -x, -x,
+     x,  x, -x,
+     x,  x, -x,
+    -x,  x, -x,
+    -x, -x, -x,
+
+    -x, -x,  x,
+     x, -x,  x,
+     x,  x,  x,
+     x,  x,  x,
+    -x,  x,  x,
+    -x, -x,  x,
+
+    -x,  x,  x,
+    -x,  x, -x,
+    -x, -x, -x,
+    -x, -x, -x,
+    -x, -x,  x,
+    -x,  x,  x,
+
+     x,  x,  x,
+     x,  x, -x,
+     x, -x, -x,
+     x, -x, -x,
+     x, -x,  x,
+     x,  x,  x,
+
+    -x, -x, -x,
+     x, -x, -x,
+     x, -x,  x,
+     x, -x,  x,
+    -x, -x,  x,
+    -x, -x, -x,
+
+    -x,  x, -x,
+     x,  x, -x,
+     x,  x,  x,
+     x,  x,  x,
+    -x,  x,  x,
+    -x,  x, -x,
+  };
+  glEnableClientState(GL_VERTEX_ARRAY);
+  glVertexPointer(3, GL_FLOAT, 0, vertex);
+  glDrawArrays(GL_TRIANGLES, 0, 36);
+  glDisableClientState(GL_VERTEX_ARRAY);
 }
 
 void drawLid(float radius, float h) {
@@ -307,7 +322,7 @@ void drawCilindre(float radius, float h) {
     glBindTexture(GL_TEXTURE_2D, texture[0]);
     glBegin(GL_QUAD_STRIP);
     glColor3f(1, 1, 1);
-    for (int j = step; j >= 0; j--) {
+    for (int j = step; j >= 0; j-= onTex) {
       for (int k = i + 1; k >= i; k--) {
         glNormal3f(v[k][j].xn, v[k][j].yn, v[k][j].zn);
         glTexCoord2f(v[k][j].xt, v[k][j].yt);
@@ -356,7 +371,6 @@ void display(GLFWwindow *window) {
   if (activeLight)
     glEnable(GL_LIGHTING);
   glPushMatrix();
-  // drawRoom();
   glTranslatef(x, y, 0);
   glRotatef(spin_x, 1, 0, 0);
   glRotatef(spin_y, 0, 1, 0);
@@ -383,7 +397,6 @@ int main() {
   glfwSetKeyCallback(window, key_callback);
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_NORMALIZE);
-  // glEnable(GL_CULL_FACE);
   glShadeModel(GL_SMOOTH);
   glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
   glClearColor(0.0, 0.0, 0.0, 0.0);
