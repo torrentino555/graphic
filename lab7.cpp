@@ -10,7 +10,15 @@
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 
 const GLuint WIDTH = 800, HEIGHT = 800;
-GLfloat spin_x = 0.0f, spin_y = 0.0f, spin_z = 0.0f, scale = 1.0f, x = 0.0f, y = 0.0f, z = 0.0f;
+GLfloat spin_x = 0.0f, spin_y = 0.0f, spin_z = 0.0f, scale = 1.0f, x = 0.0f, y = 0.0f, z = 0.0f, timer = glfwGetTime();
+GLboolean moving = false;
+
+void MoveObject() {
+  spin_x += 2.0f * (glfwGetTime() - timer);
+  spin_y += 2.0f * (glfwGetTime() - timer);
+  spin_z += 2.0f * (glfwGetTime() - timer);
+  timer = glfwGetTime();
+}
 
 int main()
 {
@@ -94,6 +102,9 @@ int main()
 
     while (!glfwWindowShouldClose(window))
     {
+        if (moving)
+          MoveObject();
+
         glfwPollEvents();
 
         glClearColor(0.2f, 0.1f, 0.1f, 1.0f);
@@ -127,6 +138,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
     glfwSetWindowShouldClose(window, GL_TRUE);
+  else if (key == GLFW_KEY_M && action == GLFW_PRESS)
+    moving = !moving;
   else if (key == GLFW_KEY_S && action != GLFW_RELEASE)
     spin_x += 0.1f;
   else if (key == GLFW_KEY_W && action != GLFW_RELEASE)
