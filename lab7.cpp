@@ -13,22 +13,24 @@
 
 using namespace std;
 
-int WIDTH = 600, HEIGHT = 600, spin_x = 0, spin_y = 0, spin_z = 0, step = 150,
-    sign_animation = 1, onTex = 1;
+int WIDTH = 600, HEIGHT = 600, spin_x = 0, spin_y = 0, spin_z = 0, step = 30,
+    sign_animation = 1, buffer = 0, onTex = 1;
 float x = 0, y = 0, scale = 1, x_l = 0.95, y_l = 0.0, z_l = 0.0, angle = 0,
       spin_l = 0, t = 0, radiusCilindre = 0.1, heightCilindre = 0.3,
-      timer = glfwGetTime(), buffer = 0, dt;
+      timer = glfwGetTime(), dt;
 bool Fill = true, moving = false, light = false, activeLight = false,
-     drawT = false, animation = false;
+     drawT = false, animation = false, global_ambient = false, two_side = true,
+     local_viewer = false;
 GLuint texture[2];
 struct vertex {
   float x, y, z, xn, yn, zn, xt, yt;
 };
-vector<vector<vertex>> v, l, vbuf, lbuf;
+vector<vector<vertex>> v, l, vbuf, lbuf, g, gbuf;
 
 void CalculateVertexs(double radius, double height) {
   v.clear();
   l.clear();
+  g.clear();
   float angle = 0, h;
   for (int i = 0; i <= step + 1; angle += 2 * M_PI / step, i++) {
     h = 0;
@@ -43,14 +45,21 @@ void CalculateVertexs(double radius, double height) {
                     (float)(step + 1 - i) / (step + 1), 1});
     float r = radius;
     l.push_back(vector<vertex>());
-    for (int j = 0; j < step; r -= radius / step, j++)
+    g.push_back(vector<vertex>());
+    for (int j = 0; j < step; r -= radius / step, j++) {
       l[i].push_back({r * cos(angle), 0, r * sin(angle), 0, 0, 0,
                       ((r / radius) * cos(angle) + 1) / 2,
                       ((r / radius) * sin(angle) + 1) / 2});
+      g[i].push_back({r * cos(angle), v[0][step].y, r * sin(angle), 0, 0, 0,
+                      ((r / radius) * cos(angle) + 1) / 2,
+                      ((r / radius) * sin(angle) + 1) / 2});
+    }
     l[i].push_back({0, 0, 0, 0, 0, 0, 0.5, 0.5});
+    g[i].push_back({0, 0, 0, 0, 0, 0, 0.5, 0.5});
   }
   vbuf = vector<vector<vertex>>(v);
   lbuf = vector<vector<vertex>>(l);
+  gbuf = vector<vector<vertex>>(g);
 }
 
 vertex p2 = {0.5f, 0, 0};
@@ -70,6 +79,7 @@ void twining() {
     for (int j = 0; j <= step; j++) {
       vertex p4_l = {lbuf[i][j].x, lbuf[i][j].y, lbuf[i][j].z + 0.5f};
       vertex p4_v = {vbuf[i][j].x, vbuf[i][j].y, vbuf[i][j].z + 0.5f};
+      vertex p4_g = {gbuf[i][j].x, gbuf[i][j].y, vbuf[i][j].z + 0.5f};
       float var1 = 1 - t;
       float var2 = var1 * var1 * var1;
       float var3 = t * t * t;
@@ -85,6 +95,12 @@ void twining() {
                   3 * t * t * var1 * p3.y + var3 * p4_l.y;
       l[i][j].z = var2 * lbuf[i][j].z + 3 * t * var1 * var1 * p2.z +
                   3 * t * t * var1 * p3.z + var3 * p4_l.z;
+      g[i][j].x = var2 * gbuf[i][j].x + 3 * t * var1 * var1 * p2.x +
+                  3 * t * t * var1 * p3.x + var3 * p4_g.x;
+      g[i][j].y = var2 * gbuf[i][j].y + 3 * t * var1 * var1 * p2.y +
+                  3 * t * t * var1 * p3.y + var3 * p4_g.y;
+      g[i][j].z = var2 * gbuf[i][j].z + 3 * t * var1 * var1 * p2.z +
+                  3 * t * t * var1 * p3.z + var3 * p4_g.z;
     }
   }
 }
@@ -167,6 +183,12 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action,
     glDisable(GL_LIGHTING);
   } else if (key == GLFW_KEY_R && action == GLFW_PRESS)
     spin_x = spin_y = spin_z = 0;
+  else if (key == GLFW_KEY_U && action == GLFW_PRESS)
+    global_ambient = !global_ambient;
+  else if (key == GLFW_KEY_Y && action == GLFW_PRESS)
+    two_side = !two_side;
+  else if (key == GLFW_KEY_H && action == GLFW_PRESS)
+    local_viewer = !local_viewer;
 
   else if (key == GLFW_KEY_LEFT && action != GLFW_RELEASE)
     x_l -= 0.1;
@@ -205,19 +227,37 @@ void load(string path, int number) {
       SOIL_load_image(path.c_str(), &width, &height, 0, SOIL_LOAD_RGB);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+  glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
                GL_UNSIGNED_BYTE, image);
 }
 
 void init_light() {
-  float light0_diffuse[] = {1, 1, 1};
+  float light0_diffuse[] = {0.8f, 0.8f, 0.8f};
   float light0_position[] = {x_l, y_l, z_l, 1.0};
-  float light0_ambient[] = {0.8, 0.8, 0.8};
+  float light0_ambient[] = {0.8, 0.8, 0.8, 1.0};
+  GLfloat specular[] = { 1.0f, 1.0f, 1.0f, 1.0f};
+  float light0_specular[] = {0.2f, 0.2f, 0.2f, 1.0f};
+  float ambient[] = {0.5f, 0.2f, 0.2f, 1.0f};
+  float default_amb[] = {0.2f, 0.2f, 0.2f, 1.0f};
   glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
+  if (global_ambient)
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
+  else
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, default_amb);
+  if (two_side)
+    glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
+  else
+    glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE);
+  if (local_viewer)
+    glLightModelf(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
+  else
+    glLightModelf(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_FALSE);
+
   glLightfv(GL_LIGHT0, GL_AMBIENT, light0_ambient);
   glLightfv(GL_LIGHT0, GL_DIFFUSE, light0_diffuse);
+  glLightfv(GL_LIGHT0, GL_SPECULAR,specular);
   glLightfv(GL_LIGHT0, GL_POSITION, light0_position);
 }
 
@@ -306,7 +346,7 @@ void drawLid(float radius, float h) {
       for (int k = i; k < i + 2; k++) {
         glNormal3f(0, 1, 0);
         glTexCoord2f(l[k][j].xt, l[k][j].yt);
-        glVertex3f(l[k][j].x, l[k][j].y + v[0][step].y, l[k][j].z);
+        glVertex3f(l[k][j].x, g[k][j].y, l[k][j].z);
       }
     glEnd();
   }
@@ -345,15 +385,10 @@ void drawRoom() {
   glEnd();
 }
 
+float h = 0.0f;
+
 void display(GLFWwindow *window) {
-  dt = glfwGetTime() - timer;
-  buffer += dt;
   timer = glfwGetTime();
-  if (buffer >= 0.5) {
-    printf("\r%3d", (int)(1.0 / dt));
-    fflush(stdout);
-    buffer = 0;
-  }
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   if (Fill)
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -371,6 +406,7 @@ void display(GLFWwindow *window) {
   if (activeLight)
     glEnable(GL_LIGHTING);
   glPushMatrix();
+  // drawRoom();
   glTranslatef(x, y, 0);
   glRotatef(spin_x, 1, 0, 0);
   glRotatef(spin_y, 0, 1, 0);
@@ -378,6 +414,14 @@ void display(GLFWwindow *window) {
   glScalef(scale, scale, scale);
   drawCilindre(radiusCilindre, heightCilindre);
   glPopMatrix();
+  dt = glfwGetTime() - timer;
+  h += dt;
+  if (buffer++ == 1000) {
+    printf("\r%3f", h/1000);
+    fflush(stdout);
+    buffer = 0;
+    h = 0;
+  }
 }
 
 int main() {
@@ -397,8 +441,8 @@ int main() {
   glfwSetKeyCallback(window, key_callback);
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_NORMALIZE);
+  glEnable(GL_CULL_FACE);
   glShadeModel(GL_SMOOTH);
-  glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
   glClearColor(0.0, 0.0, 0.0, 0.0);
   resize(window, WIDTH, HEIGHT);
   CalculateVertexs(radiusCilindre, heightCilindre);

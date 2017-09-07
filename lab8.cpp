@@ -112,7 +112,6 @@ int main()
 
         ourShader.Use();
 
-        // Create transformations
         glm::mat4 transform;
         transform = glm::translate(transform, glm::vec3(x, y, z));
         transform = glm::rotate(transform, -spin_x, glm::vec3(1.0f, 0.0f, 0.0f));
